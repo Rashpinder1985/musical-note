@@ -1,5 +1,5 @@
-streamlit
-numpy
 sounddevice
+numpy
 scipy
-pipwin
+streamlit
+
