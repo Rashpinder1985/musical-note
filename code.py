@@ -1,8 +1,9 @@
 import streamlit as st
 import numpy as np
-import sounddevice as sd
+from pydub import AudioSegment
+from pydub.generators import Sine, Square, Sawtooth
+import simpleaudio as sa
 import time
-from scipy.signal import square, sawtooth
 
 # Constants
 SAMPLE_RATE = 44100  # 44.1 kHz sample rate
@@ -15,34 +16,36 @@ NOTE_FREQUENCIES = {
 }
 
 
-# Generate waveform
+# Generate waveform using pydub generators
 def generate_waveform(wave_type, frequency, duration):
-    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
     if wave_type == "Sine":
-        wave = np.sin(2 * np.pi * frequency * t)
+        wave = Sine(frequency).to_audio_segment(duration * 1000)  # duration in milliseconds
     elif wave_type == "Square":
-        wave = square(2 * np.pi * frequency * t)
+        wave = Square(frequency).to_audio_segment(duration * 1000)
     elif wave_type == "Sawtooth":
-        wave = sawtooth(2 * np.pi * frequency * t)
+        wave = Sawtooth(frequency).to_audio_segment(duration * 1000)
     else:
-        wave = np.zeros_like(t)
+        wave = AudioSegment.silent(duration * 1000)  # Generate silence if invalid type
     return wave
 
 
-# Play melody
+# Play melody using pydub
 def play_melody(notes, wave_type, duration, tempo):
-    silence = np.zeros(int(SAMPLE_RATE * 0.05))  # Short silence between notes
-    full_wave = np.array([])
+    silence_duration = 50  # 50ms silence between notes
+    full_wave = AudioSegment.silent(0)  # Start with no sound
 
     for note in notes.split():
         freq = NOTE_FREQUENCIES.get(note, 0)  # Default to silence if note not found
         if freq > 0:
             wave = generate_waveform(wave_type, freq, duration)
-            full_wave = np.concatenate((full_wave, wave, silence))
+            full_wave += wave
+            # Add a short silence between notes
+            full_wave += AudioSegment.silent(silence_duration)
 
-    sd.play(full_wave, SAMPLE_RATE)
-    time.sleep(len(full_wave) / SAMPLE_RATE)
-    sd.stop()
+    # Play the full melody using simpleaudio
+    play_obj = sa.play_buffer(full_wave.raw_data, num_channels=full_wave.channels,
+                              bytes_per_sample=full_wave.sample_width, sample_rate=full_wave.frame_rate)
+    play_obj.wait_done()
 
 
 # Streamlit UI
